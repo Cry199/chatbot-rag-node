@@ -6,7 +6,33 @@ const config = require('../config');
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 const geminiChatModel = genAI.getGenerativeModel({ model: config.models.chat });
 const geminiEmbeddingModel = genAI.getGenerativeModel({ model: config.models.embedding });
-const chromaClient = new ChromaClient({ path: config.chromaDbHost });
+
+const chromaClient = new ChromaClient({
+    path: config.chromaDbHost 
+});
+
+async function startHeartbeat() {
+    try {
+        // Faz uma verificação inicial para garantir que a conexão funciona.
+        const hb = await chromaClient.heartbeat();
+        console.log('[Service] Conexão inicial com ChromaDB bem-sucedida. Heartbeat nanoseconds:', hb);
+
+        // Define um intervalo para pingar o DB a cada 5 minutos
+        setInterval(async () => {
+            try {
+                await chromaClient.heartbeat();
+                console.log('[Heartbeat] Ping para ChromaDB OK.');
+            } catch (e) {
+                console.error("[Heartbeat] Ping para ChromaDB falhou:", e.message);
+            }
+        }, 300000); 
+
+    } catch (e) {
+        console.error("ERRO CRÍTICO: Não foi possível conectar ao ChromaDB na inicialização.", e.message);
+        console.error("Certifique-se de que o contêiner do Docker do ChromaDB está rodando.");
+        process.exit(1); // Encerra o processo se a conexão inicial falhar.
+    }
+}
 
 async function generateQueryEmbedding(query) {
     console.log("[Service] Gerando embedding da consulta...");
@@ -57,17 +83,20 @@ async function processQuery(query) {
 
     console.log("[Service] Enviando prompt para o Gemini e iniciando o streaming...");
     const result = await geminiChatModel.generateContentStream(augmentedPrompt);
-    
-    // Transforma o stream do Gemini em um stream que podemos retornar
+
     async function* getStream() {
         for await (const chunk of result.stream) {
             yield chunk.text();
         }
     }
     
-    return getStream();
+    return {
+        stream: getStream(),
+        sources: relevantChunks
+    };
 }
 
 module.exports = {
-    processQuery
+    processQuery,
+    startHeartbeat // Exporta a nova função
 };
