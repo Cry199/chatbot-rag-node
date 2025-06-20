@@ -57,18 +57,16 @@ async function chunkText(text) {
 async function generateEmbeddings(textChunks) {
     console.log(`[ETAPA 3] Iniciando a geração de ${textChunks.length} embeddings...`);
     try {
-        // O modelo 'text-embedding-004' suporta um tamanho de lote de até 100.
         const batchSize = 100;
         let allEmbeddings = [];
 
         for (let i = 0; i < textChunks.length; i += batchSize) {
             const batch = textChunks.slice(i, i + batchSize);
 
-            // A estrutura da requisição está correta para batching.
             const result = await embeddingModel.batchEmbedContents({
                 requests: batch.map(text => ({
-                    model: "text-embedding-004", // Especifica o modelo para cada requisição no lote
                     content: { parts: [{ text }] },
+                    taskType: "RETRIEVAL_DOCUMENT",
                 })),
             });
 
