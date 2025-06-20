@@ -6,7 +6,6 @@
     <title>Chatbot RAG com Gemini</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Animação do cursor piscando */
         .blinking-cursor {
             display: inline-block;
             width: 8px;
@@ -21,10 +20,17 @@
             50% { background-color: #1f2937; }
         }
         
-        /* Oculta a barra de rolagem mas permite rolar */
         #chat-window::-webkit-scrollbar { display: none; }
         #chat-window { -ms-overflow-style: none; scrollbar-width: none; }
 
+        .sources-wrapper {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out;
+        }
+        .sources-wrapper.open {
+            max-height: 500px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans flex items-center justify-center min-h-screen">
@@ -74,10 +80,14 @@
         const API_URL = 'http://localhost:8080/api/chat';
         const STREAM_SEPARATOR = '\n--STREAM_SEPARATOR--\n';
 
+        let conversationHistory = [];
+
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = messageInput.value.trim();
             if (!query) return;
+            
+            conversationHistory.push({ role: 'user', text: query });
 
             messageInput.value = '';
             messageInput.disabled = true;
@@ -92,7 +102,7 @@
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify({ query, history: conversationHistory.slice(0, -1) }) // Envia o histórico SEM a pergunta atual
                 });
 
                 if (!response.ok) throw new Error((await response.json()).error || 'Erro no servidor.');
@@ -101,6 +111,7 @@
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let sourcesProcessed = false;
+                let fullResponse = ''; // Variável para acumular a resposta completa do bot.
                 
                 botTextElement.innerHTML = ''; 
 
@@ -109,7 +120,8 @@
                     if (done) break;
                     
                     buffer += decoder.decode(value, { stream: true });
-                    
+                    let streamPartToRender = buffer;
+
                     if (!sourcesProcessed && buffer.includes(STREAM_SEPARATOR)) {
                         const [sourcesJson, streamPart] = buffer.split(STREAM_SEPARATOR);
                         
@@ -118,20 +130,27 @@
                             addSources(botContentContainer, sources);
                         }
                         
-                        botTextElement.textContent = streamPart;
-                        buffer = streamPart; 
+                        streamPartToRender = streamPart;
                         sourcesProcessed = true;
-                    } else if(sourcesProcessed) {
-                        botTextElement.textContent += buffer;
-                        buffer = '';
+                        buffer = streamPart;
+                    }
+                    
+                    if (sourcesProcessed) {
+                        fullResponse += streamPartToRender;
+                        botTextElement.textContent = fullResponse;
+                        buffer = (buffer === streamPartToRender) ? '' : buffer;
                     }
 
                     chatWindow.scrollTop = chatWindow.scrollHeight;
                 }
 
+                conversationHistory.push({ role: 'model', text: fullResponse });
+
             } catch (error) {
                 console.error('Erro:', error);
                 botTextElement.innerHTML = `<span class="text-red-500">Erro: ${error.message}</span>`;
+                // Remove a última pergunta do usuário do histórico se a chamada falhar
+                conversationHistory.pop();
             } finally {
                 messageInput.disabled = false;
                 sendButton.disabled = false;
@@ -168,6 +187,15 @@
         }
         
         function addSources(contentContainer, sources) {
+            const sourcesButton = document.createElement('button');
+            sourcesButton.className = 'flex items-center space-x-2 text-sm text-indigo-600 mt-2 hover:underline focus:outline-none font-semibold';
+            
+            const buttonIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`;
+            const buttonTextSpan = document.createElement('span');
+            buttonTextSpan.textContent = 'Mostrar Fontes';
+            sourcesButton.innerHTML = buttonIcon;
+            sourcesButton.appendChild(buttonTextSpan);
+            
             const sourcesWrapper = document.createElement('div');
             sourcesWrapper.className = 'w-full hidden';
 
@@ -193,17 +221,7 @@
             
             sourcesWrapper.appendChild(sourcesContent);
 
-            const sourcesButton = document.createElement('button');
-            sourcesButton.className = 'flex items-center space-x-2 text-sm text-indigo-600 mt-2 hover:underline focus:outline-none font-semibold';
-            
-            const buttonIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`;
-            const buttonTextSpan = document.createElement('span');
-            buttonTextSpan.textContent = 'Mostrar Fontes';
-            sourcesButton.innerHTML = buttonIcon;
-            sourcesButton.appendChild(buttonTextSpan);
-
             sourcesButton.onclick = () => {
-                // **CORREÇÃO DEFINITIVA**: Alterna a classe 'hidden' do Tailwind CSS.
                 sourcesWrapper.classList.toggle('hidden');
                 buttonTextSpan.textContent = sourcesWrapper.classList.contains('hidden') ? 'Mostrar Fontes' : 'Ocultar Fontes';
             };
