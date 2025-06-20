@@ -11,28 +11,35 @@ const chromaClient = new ChromaClient({
     path: config.chromaDbHost 
 });
 
-async function startHeartbeat() {
+
+async function transformQueryWithHistory(query, history) {
+    if (!history || history.length === 0) {
+        return query; // Se não há histórico, usa a pergunta original.
+    }
+
+    const historyText = history.map(h => `${h.role}: ${h.text}`).join('\n');
+
+    const prompt = `Com base no histórico da conversa e na nova pergunta, reformule a nova pergunta para que seja uma **pergunta autônoma e específica**, ideal para uma busca semântica.
+
+HISTÓRICO:
+${historyText}
+
+NOVA PERGUNTA: ${query}
+
+PERGUNTA REFORMULADA:`;
+
+    console.log("[Service] Transformando a consulta com base no histórico...");
     try {
-        // Faz uma verificação inicial para garantir que a conexão funciona.
-        const hb = await chromaClient.heartbeat();
-        console.log('[Service] Conexão inicial com ChromaDB bem-sucedida. Heartbeat nanoseconds:', hb);
-
-        // Define um intervalo para pingar o DB a cada 5 minutos
-        setInterval(async () => {
-            try {
-                await chromaClient.heartbeat();
-                console.log('[Heartbeat] Ping para ChromaDB OK.');
-            } catch (e) {
-                console.error("[Heartbeat] Ping para ChromaDB falhou:", e.message);
-            }
-        }, 300000); 
-
-    } catch (e) {
-        console.error("ERRO CRÍTICO: Não foi possível conectar ao ChromaDB na inicialização.", e.message);
-        console.error("Certifique-se de que o contêiner do Docker do ChromaDB está rodando.");
-        process.exit(1);
+        const result = await geminiChatModel.generateContent(prompt);
+        const transformedQuery = result.response.text();
+        console.log(`[Service] Consulta transformada: "${transformedQuery}"`);
+        return transformedQuery;
+    } catch (error) {
+        console.error("[Service] Erro ao transformar a consulta, usando a original.", error);
+        return query; // Em caso de erro, recorre à pergunta original.
     }
 }
+
 
 async function generateQueryEmbedding(query) {
     console.log("[Service] Gerando embedding da consulta...");
@@ -89,7 +96,10 @@ Se a resposta não estiver contida no contexto, diga claramente: "Com base nos d
 }
 
 async function processQuery(query, history) {
-    const queryEmbedding = await generateQueryEmbedding(query);
+    const searchQuery = await transformQueryWithHistory(query, history);
+    
+    const queryEmbedding = await generateQueryEmbedding(searchQuery);
+
     const relevantChunks = await findRelevantChunks(queryEmbedding);
     const augmentedPrompt = buildAugmentedPrompt(query, relevantChunks, history);
 
@@ -106,6 +116,29 @@ async function processQuery(query, history) {
         stream: getStream(),
         sources: relevantChunks
     };
+}
+
+async function startHeartbeat() {
+    try {
+        // Faz uma verificação inicial para garantir que a conexão funciona.
+        const hb = await chromaClient.heartbeat();
+        console.log('[Service] Conexão inicial com ChromaDB bem-sucedida. Heartbeat nanoseconds:', hb);
+
+        // Define um intervalo para pingar o DB a cada 5 minutos
+        setInterval(async () => {
+            try {
+                await chromaClient.heartbeat();
+                console.log('[Heartbeat] Ping para ChromaDB OK.');
+            } catch (e) {
+                console.error("[Heartbeat] Ping para ChromaDB falhou:", e.message);
+            }
+        }, 300000); 
+
+    } catch (e) {
+        console.error("ERRO CRÍTICO: Não foi possível conectar ao ChromaDB na inicialização.", e.message);
+        console.error("Certifique-se de que o contêiner do Docker do ChromaDB está rodando.");
+        process.exit(1);
+    }
 }
 
 module.exports = {
