@@ -30,7 +30,7 @@ async function startHeartbeat() {
     } catch (e) {
         console.error("ERRO CRÍTICO: Não foi possível conectar ao ChromaDB na inicialização.", e.message);
         console.error("Certifique-se de que o contêiner do Docker do ChromaDB está rodando.");
-        process.exit(1); // Encerra o processo se a conexão inicial falhar.
+        process.exit(1);
     }
 }
 
@@ -58,32 +58,44 @@ async function findRelevantChunks(queryEmbedding) {
     }
 }
 
-function buildAugmentedPrompt(originalQuery, relevantChunks) {
-    console.log("[Service] Construindo prompt aumentado...");
+function buildAugmentedPrompt(originalQuery, relevantChunks, history) {
+    console.log("[Service] Construindo prompt aumentado com histórico...");
     const context = relevantChunks.join('\n\n---\n\n');
-    return `
-Você é um assistente especialista e preciso. Sua tarefa é responder à pergunta do usuário baseando-se *exclusivamente* no contexto fornecido abaixo. Não utilize nenhum conhecimento prévio.
+    
+    // Formata o histórico para ser incluído no prompt
+    const historyText = history.map(h => `${h.role}: ${h.text}`).join('\n');
 
-**CONTEXTO:**
+    return `
+Você é um assistente especialista e preciso. Sua tarefa é responder à pergunta do usuário.
+
+**Regras Importantes:**
+1.  Baseie-se **exclusivamente** no **CONTEXTO** fornecido abaixo para responder à pergunta.
+2.  Considere o **HISTÓRICO DA CONVERSA** para entender perguntas subsequentes (ex: "e sobre ele?").
+3.  Não utilize nenhum conhecimento prévio que não esteja no contexto.
+
+**CONTEXTO DOS DOCUMENTOS:**
 ---
 ${context}
 ---
 
-**PERGUNTA:**
+**HISTÓRICO DA CONVERSA:**
+${historyText}
+
+**PERGUNTA ATUAL:**
 ${originalQuery}
 
 Se a resposta não estiver contida no contexto, diga claramente: "Com base nos documentos fornecidos, não consigo responder a essa pergunta."
 `;
 }
 
-async function processQuery(query) {
+async function processQuery(query, history) {
     const queryEmbedding = await generateQueryEmbedding(query);
     const relevantChunks = await findRelevantChunks(queryEmbedding);
-    const augmentedPrompt = buildAugmentedPrompt(query, relevantChunks);
+    const augmentedPrompt = buildAugmentedPrompt(query, relevantChunks, history);
 
     console.log("[Service] Enviando prompt para o Gemini e iniciando o streaming...");
     const result = await geminiChatModel.generateContentStream(augmentedPrompt);
-
+    
     async function* getStream() {
         for await (const chunk of result.stream) {
             yield chunk.text();
@@ -98,5 +110,5 @@ async function processQuery(query) {
 
 module.exports = {
     processQuery,
-    startHeartbeat // Exporta a nova função
+    startHeartbeat
 };
