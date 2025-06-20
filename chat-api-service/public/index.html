@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot RAG com Gemini</title>
+    <!-- Incluindo Tailwind CSS para estilização rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo para a animação do cursor piscando */
+        .blinking-cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1.2rem;
+            background-color: #333;
+            animation: blink 1s step-end infinite;
+            vertical-align: bottom;
+        }
+
+        @keyframes blink {
+            from, to {
+                background-color: transparent;
+            }
+            50% {
+                background-color: #333;
+            }
+        }
+        
+        /* Oculta a barra de rolagem mas permite rolar */
+        #chat-window::-webkit-scrollbar {
+            display: none;
+        }
+        #chat-window {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans flex items-center justify-center min-h-screen">
+
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col">
+        <!-- Cabeçalho do Chat -->
+        <div class="bg-blue-600 text-white p-4 rounded-t-lg shadow-md">
+            <h1 class="text-xl font-bold">Converse com seus Documentos</h1>
+            <p class="text-sm text-blue-200">Assistente com tecnologia Gemini & RAG</p>
+        </div>
+
+        <!-- Janela de Chat -->
+        <div id="chat-window" class="flex-1 p-6 overflow-y-auto">
+            <!-- Mensagem inicial do bot -->
+            <div class="mb-4">
+                <div class="bg-gray-200 text-gray-800 p-3 rounded-lg inline-block max-w-lg">
+                    <p>Olá! Faça uma pergunta sobre os documentos que eu processei.</p>
+                </div>
+            </div>
+            <!-- Novas mensagens serão adicionadas aqui -->
+        </div>
+
+        <!-- Formulário de Entrada -->
+        <div class="p-4 bg-gray-50 rounded-b-lg border-t border-gray-200">
+            <form id="chat-form" class="flex items-center space-x-4">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Digite sua pergunta..." 
+                    class="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    autocomplete="off">
+                <button 
+                    type="submit" 
+                    id="send-button"
+                    class="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        const API_URL = 'http://localhost:8080/api/chat';
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = messageInput.value.trim();
+            if (!query) return;
+
+            // Desabilita o formulário durante o processamento
+            messageInput.value = '';
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+
+            // Adiciona a mensagem do usuário à janela de chat
+            addMessage(query, 'user');
+
+            // Cria um contêiner para a resposta do bot e a animação
+            const botMessageContainer = addMessage('', 'bot');
+            const botTextElement = botMessageContainer.querySelector('p');
+            botTextElement.innerHTML = '<span class="blinking-cursor"></span>';
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ocorreu um erro no servidor.');
+                }
+                
+                // Processa a resposta em streaming
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+
+                // Remove o cursor antes de começar a escrever
+                botTextElement.innerHTML = ''; 
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullResponse += chunk;
+                    botTextElement.textContent = fullResponse; // Usa textContent para segurança
+                    chatWindow.scrollTop = chatWindow.scrollHeight; // Mantém a rolagem no final
+                }
+
+            } catch (error) {
+                console.error('Erro ao enviar a pergunta:', error);
+                botTextElement.innerHTML = `<span class="text-red-500">Erro: ${error.message}</span>`;
+            } finally {
+                // Reabilita o formulário
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        });
+
+        /**
+         * Adiciona uma mensagem à janela de chat.
+         * @param {string} text O texto da mensagem.
+         * @param {'user' | 'bot'} sender Quem enviou a mensagem.
+         * @returns {HTMLElement} O elemento da mensagem adicionado.
+         */
+        function addMessage(text, sender) {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'mb-4';
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.className = 'p-3 rounded-lg inline-block max-w-lg';
+            
+            if (sender === 'user') {
+                messageContainer.classList.add('text-right');
+                messageBubble.classList.add('bg-blue-600', 'text-white');
+            } else {
+                messageBubble.classList.add('bg-gray-200', 'text-gray-800');
+            }
+
+            const textElement = document.createElement('p');
+            textElement.textContent = text;
+            
+            messageBubble.appendChild(textElement);
+            messageContainer.appendChild(messageBubble);
+            chatWindow.appendChild(messageContainer);
+
+            // Rola para a nova mensagem
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return messageContainer;
+        }
+    </script>
+</body>
+</html>
