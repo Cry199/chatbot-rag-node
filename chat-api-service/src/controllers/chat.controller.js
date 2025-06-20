@@ -10,20 +10,22 @@ async function handleChatRequest(req, res) {
     try {
         console.log(`[Controller] Recebida a consulta: "${query}"`);
 
-        // Delega toda a lógica de negócio para o serviço RAG
-        const stream = await ragService.processQuery(query);
+        const { stream, sources } = await ragService.processQuery(query);
 
-        // Configura os cabeçalhos para streaming
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
+        
+        const sourcesJson = JSON.stringify({ sources });
+        res.write(sourcesJson + '\n--STREAM_SEPARATOR--\n');
+        console.log('[Controller] Fontes enviadas para o cliente.');
 
-        // Itera sobre o stream e envia cada pedaço para o cliente
+        // Itera sobre o stream da resposta do Gemini e envia cada pedaço.
         for await (const chunk of stream) {
             res.write(chunk);
         }
 
         console.log("[Controller] Streaming da resposta concluído.");
-        res.end(); // Finaliza a resposta do stream
+        res.end();
 
     } catch (error) {
         console.error("[Controller] Erro no fluxo de chat:", error);
