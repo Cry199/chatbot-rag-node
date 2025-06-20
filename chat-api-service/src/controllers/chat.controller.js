@@ -1,7 +1,7 @@
 const ragService = require('../services/rag.service');
 
 async function handleChatRequest(req, res) {
-    const { query } = req.body;
+    const { query, history } = req.body;
 
     if (!query) {
         return res.status(400).json({ error: 'A consulta (query) é obrigatória.' });
@@ -10,16 +10,15 @@ async function handleChatRequest(req, res) {
     try {
         console.log(`[Controller] Recebida a consulta: "${query}"`);
 
-        const { stream, sources } = await ragService.processQuery(query);
+        const { stream, sources } = await ragService.processQuery(query, history || []);
 
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Type', 'text/plain; charset=utf-t');
         res.setHeader('Transfer-Encoding', 'chunked');
         
         const sourcesJson = JSON.stringify({ sources });
         res.write(sourcesJson + '\n--STREAM_SEPARATOR--\n');
         console.log('[Controller] Fontes enviadas para o cliente.');
 
-        // Itera sobre o stream da resposta do Gemini e envia cada pedaço.
         for await (const chunk of stream) {
             res.write(chunk);
         }
