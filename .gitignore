@@ -1,0 +1,5 @@
+/chat-api-service/node_modules
+/ingestion-service/node_modules
+
+/chat-api-service/.env
+/ingestion-service/.env
