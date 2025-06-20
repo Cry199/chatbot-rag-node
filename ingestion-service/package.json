@@ -11,8 +11,11 @@
   "description": "",
   "dependencies": {
     "@google-cloud/documentai": "^9.2.0",
+    "@google/genai": "^1.5.1",
     "@google/generative-ai": "^0.24.1",
     "@langchain/textsplitters": "^0.1.0",
-    "dotenv": "^16.5.0"
+    "chromadb": "^3.0.4",
+    "dotenv": "^16.5.0",
+    "pdf-parse": "^1.1.1"
   }
 }

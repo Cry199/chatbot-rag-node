@@ -3,3 +3,5 @@
 
 /chat-api-service/.env
 /ingestion-service/.env
+/PDFs
+/.env
