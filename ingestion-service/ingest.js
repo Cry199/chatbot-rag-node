@@ -9,9 +9,9 @@ require('dotenv').config();
 
 // --- CONFIGURAÇÕES ---
 const GcpConfig = {
-    pdfDirectory: './PDFs/',
+    pdfDirectory: path.resolve(__dirname, '../PDFs'),
     chromaDbHost: 'http://localhost:8000',
-    chromaCollectionName: 'chatbot-docs' 
+    chromaCollectionName: 'chatbot-docs',
 };
 
 // --- CLIENTE DA API ---
@@ -84,44 +84,25 @@ async function generateEmbeddings(textChunks) {
     }
 }
 
+const dummyEmbeddingFunction = { generate: (texts) => Promise.resolve([]) };
+
 /**
  * ETAPA 4: Salva os chunks no ChromaDB.
  * A geração de embeddings será feita pela própria coleção.
  * @param {string[]} chunks Os pedaços de texto.
  */
 async function saveToChromaDB(chunks, embeddings) {
-    try {
-        const dummyEmbeddingFunction = { generate: (texts) => { 
-            console.warn("A função de embedding dummy foi chamada. Isso não deveria acontecer.");
-            return Promise.resolve([]);
-        }};
-
-        // Pega ou cria a coleção.
-        const collection = await chromaClient.getOrCreateCollection({
-            name: GcpConfig.chromaCollectionName,
-            metadata: { "hnsw:space": "cosine" },
-            embeddingFunction: dummyEmbeddingFunction
-        });
-
-        const ids = chunks.map((_, index) => `chunk_${index}_${Date.now()}`);
-        const metadatas = chunks.map(chunk => ({ source_text: chunk }));
-        const batchSize = 100;
-        for (let i = 0; i < chunks.length; i += batchSize) {
-            const batchIds = ids.slice(i, i + batchSize);
-            const batchEmbeddings = embeddings.slice(i, i + batchSize);
-            const batchMetadatas = metadatas.slice(i, i + batchSize);
-            
-            await collection.add({
-                ids: batchIds,
-                embeddings: batchEmbeddings,
-                metadatas: batchMetadatas,
-            });
-        }
-        console.log('[ETAPA 4] Dados salvos no ChromaDB com sucesso.');
-
-    } catch (error) {
-        console.error('[ERRO - ETAPA 4] Falha ao salvar dados no ChromaDB:', error);
-        throw error;
+    console.log(`[ETAPA 4] Salvando ${chunks.length} chunks no ChromaDB...`);
+    const collection = await chromaClient.getOrCreateCollection({
+        name: GcpConfig.chromaCollectionName,
+        metadata: { "hnsw:space": "cosine" },
+        embeddingFunction: dummyEmbeddingFunction // Adicionado para evitar o aviso
+    });
+    const ids = chunks.map((_, index) => `chunk_${Date.now()}_${index}`);
+    const metadatas = chunks.map(chunk => ({ source_text: chunk }));
+    const batchSize = 100;
+    for (let i = 0; i < chunks.length; i += batchSize) {
+        await collection.add({ ids: ids.slice(i, i + batchSize), embeddings: embeddings.slice(i, i + batchSize), metadatas: metadatas.slice(i, i + batchSize) });
     }
 }
 
@@ -129,43 +110,29 @@ async function saveToChromaDB(chunks, embeddings) {
  * Função principal que orquestra todo o pipeline de ingestão.
  */
 async function runIngestionPipeline() {
+    console.log('--- INICIANDO PIPELINE DE INGESTÃO DE DOCUMENTOS ---');
     try {
-        const files = await fs.readdir(GcpConfig.pdfDirectory);
-        const pdfFiles = files.filter(file => path.extname(file).toLowerCase() === '.pdf');
-
-        if (pdfFiles.length === 0) {
-            // console.log(`Nenhum arquivo PDF encontrado no diretório: ${GcpConfig.pdfDirectory}`);
+        const filesToProcess = process.argv.slice(2);
+        if (filesToProcess.length === 0) {
+            console.log('Nenhum arquivo especificado para ingestão. Encerrando.');
             return;
         }
-        
-        let allChunks = [];
-        for (const pdfFile of pdfFiles) {
+        console.log(`Arquivos para processar: ${filesToProcess.join(', ')}`);
+        for (const pdfFile of filesToProcess) {
             const fullPath = path.join(GcpConfig.pdfDirectory, pdfFile);
+            console.log(`\n--- Processando: ${pdfFile} ---`);
             const extractedText = await extractTextFromPdf(fullPath);
-            // Pula a fragmentação se a extração de texto falhar e retornar uma string vazia
             if (extractedText) {
                 const textChunks = await chunkText(extractedText);
-                allChunks.push(...textChunks);
+                const allEmbeddings = await generateEmbeddings(textChunks);
+                await saveToChromaDB(textChunks, allEmbeddings);
             }
         }
-
-        console.log(`\n[TOTAL] Processamento de texto concluído. Total de ${allChunks.length} chunks de todos os documentos.`);
-
-        let allEmbeddings = [];
-        if (allChunks.length > 0) {
-            allEmbeddings = await generateEmbeddings(allChunks);
-        }
-
-        if (allChunks.length > 0 && allEmbeddings.length > 0) {
-            await saveToChromaDB(allChunks, allEmbeddings);
-        }
-
         console.log('\n--- PIPELINE DE INGESTÃO CONCLUÍDO COM SUCESSO ---');
-        console.log('Dados de todos os PDFs foram processados e salvos no banco de dados vetorial local.');
-
     } catch (error) {
         console.error('\n--- O PIPELINE DE INGESTÃO FALHOU ---');
         console.error('Ocorreu um erro:', error.message);
+        process.exit(1);
     }
 }
 
