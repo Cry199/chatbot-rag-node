@@ -3,7 +3,7 @@ const chatWindow = document.getElementById('chat-window');
 const chatForm = document.getElementById('chat-form');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
-const clearChatButton = document.getElementById('clear-chat-button'); // Novo botão
+const clearChatButton = document.getElementById('clear-chat-button');
 
 // Constantes da API
 const API_URL = 'http://localhost:8080/api/chat';
@@ -27,8 +27,8 @@ function addWelcomeMessage() {
 
 // Event listener para o botão de limpar
 clearChatButton.addEventListener('click', () => {
-    conversationHistory = []; // Reseta o histórico
-    addWelcomeMessage(); // Mostra a mensagem inicial novamente
+    conversationHistory = [];
+    addWelcomeMessage();
 });
 
 // Event listener para o formulário de chat
@@ -38,7 +38,6 @@ chatForm.addEventListener('submit', async (e) => {
     if (!query) return;
     
     conversationHistory.push({ role: 'user', text: query });
-
     messageInput.value = '';
     messageInput.disabled = true;
     sendButton.disabled = true;
@@ -54,7 +53,6 @@ chatForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, history: conversationHistory.slice(0, -1) })
         });
-
         if (!response.ok) throw new Error((await response.json()).error || 'Erro no servidor.');
         
         const reader = response.body.getReader();
@@ -91,9 +89,7 @@ chatForm.addEventListener('submit', async (e) => {
 
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
-
         conversationHistory.push({ role: 'model', text: fullResponse });
-        // **NOVO**: Adiciona o botão de copiar após a resposta estar completa
         addCopyButton(botContentContainer.querySelector('.message-bubble'), fullResponse);
 
     } catch (error) {
@@ -148,7 +144,7 @@ function addSources(contentContainer, sources) {
     sourcesButton.appendChild(buttonTextSpan);
     
     const sourcesWrapper = document.createElement('div');
-    sourcesWrapper.className = 'sources-wrapper w-full';
+    sourcesWrapper.className = 'sources-wrapper w-full hidden';
 
     const sourcesContent = document.createElement('div');
     sourcesContent.className = 'p-3 mt-2 bg-gray-50 border border-gray-200 rounded-lg space-y-3';
@@ -170,8 +166,8 @@ function addSources(contentContainer, sources) {
     sourcesWrapper.appendChild(sourcesContent);
 
     sourcesButton.onclick = () => {
-        sourcesWrapper.classList.toggle('open');
-        buttonTextSpan.textContent = sourcesWrapper.classList.contains('open') ? 'Ocultar Fontes' : 'Mostrar Fontes';
+        sourcesWrapper.classList.toggle('hidden');
+        buttonTextSpan.textContent = sourcesWrapper.classList.contains('hidden') ? 'Mostrar Fontes' : 'Ocultar Fontes';
     };
 
     contentContainer.appendChild(sourcesButton);
@@ -193,10 +189,8 @@ function addCopyButton(messageBubble, textToCopy) {
             }, 2000);
         });
     };
-
     messageBubble.appendChild(copyButton);
 }
-
 
 // Chama a função de boas-vindas na inicialização
 addWelcomeMessage();
