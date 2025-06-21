@@ -4,61 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatbot RAG com Gemini</title>
+    <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .blinking-cursor {
-            display: inline-block;
-            width: 8px;
-            height: 1.1rem;
-            background-color: #1f2937;
-            animation: blink 1s step-end infinite;
-            vertical-align: bottom;
-        }
-
-        @keyframes blink {
-            from, to { background-color: transparent; }
-            50% { background-color: #1f2937; }
-        }
-        
-        #chat-window::-webkit-scrollbar { display: none; }
-        #chat-window { -ms-overflow-style: none; scrollbar-width: none; }
-
-        .sources-wrapper {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.4s ease-in-out;
-        }
-        .sources-wrapper.open {
-            max-height: 500px;
-        }
-    </style>
+    <!-- Link para estilos externa -->
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="bg-gray-100 font-sans flex items-center justify-center min-h-screen">
 
     <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col">
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 rounded-t-lg shadow-md flex items-center space-x-3">
-            <div class="bg-white/30 p-2 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.375a6.375 6.375 0 0 0 6.375-6.375V9.75A6.375 6.375 0 0 0 12 3.375A6.375 6.375 0 0 0 5.625 9.75v2.25A6.375 6.375 0 0 0 12 18.375Z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.375a6.375 6.375 0 0 0 6.375-6.375V9.75A6.375 6.375 0 0 0 12 3.375A6.375 6.375 0 0 0 5.625 9.75v2.25A6.375 6.375 0 0 0 12 18.375Z" transform="rotate(45 12 12)" />
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold">Converse com seus Documentos</h1>
-                <p class="text-sm text-blue-200">Assistente com tecnologia Gemini & RAG</p>
-            </div>
-        </div>
-
-        <div id="chat-window" class="flex-1 p-6 overflow-y-auto">
-            <div class="flex justify-start">
-                <div class="flex flex-col items-start max-w-lg">
-                    <div class="bg-gray-200 text-gray-800 p-3 rounded-lg">
-                        <p>Olá! Faça uma pergunta sobre os documentos que eu processei.</p>
-                    </div>
+        <!-- Cabeçalho -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 rounded-t-lg shadow-md flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/30 p-2 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.375a6.375 6.375 0 0 0 6.375-6.375V9.75A6.375 6.375 0 0 0 12 3.375A6.375 6.375 0 0 0 5.625 9.75v2.25A6.375 6.375 0 0 0 12 18.375Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.375a6.375 6.375 0 0 0 6.375-6.375V9.75A6.375 6.375 0 0 0 12 3.375A6.375 6.375 0 0 0 5.625 9.75v2.25A6.375 6.375 0 0 0 12 18.375Z" transform="rotate(45 12 12)" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Converse com seus Documentos</h1>
+                    <p class="text-sm text-blue-200">Assistente com tecnologia Gemini & RAG</p>
                 </div>
             </div>
+            <!-- Botão para Limpar a Conversa -->
+            <button id="clear-chat-button" title="Limpar conversa" class="p-2 rounded-full text-white/70 hover:bg-white/20 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" transform="rotate(45 12 12)" />
+                </svg>
+            </button>
         </div>
 
+        <!-- Janela do Chat -->
+        <div id="chat-window" class="flex-1 p-6 overflow-y-auto">
+            <!-- As mensagens aparecerão aqui -->
+        </div>
+
+        <!-- Input -->
         <div class="p-4 bg-gray-50 rounded-b-lg border-t border-gray-200">
             <form id="chat-form" class="flex items-center space-x-3">
                 <input type="text" id="message-input" placeholder="Digite sua pergunta..." class="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" autocomplete="off">
@@ -71,164 +52,7 @@
         </div>
     </div>
 
-    <script>
-        const chatWindow = document.getElementById('chat-window');
-        const chatForm = document.getElementById('chat-form');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-
-        const API_URL = 'http://localhost:8080/api/chat';
-        const STREAM_SEPARATOR = '\n--STREAM_SEPARATOR--\n';
-
-        let conversationHistory = [];
-
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const query = messageInput.value.trim();
-            if (!query) return;
-            
-            conversationHistory.push({ role: 'user', text: query });
-
-            messageInput.value = '';
-            messageInput.disabled = true;
-            sendButton.disabled = true;
-
-            addMessage(query, 'user');
-            const botContentContainer = addMessage('', 'bot');
-            const botTextElement = botContentContainer.querySelector('.message-text');
-            botTextElement.innerHTML = '<span class="blinking-cursor"></span>';
-            
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, history: conversationHistory.slice(0, -1) }) // Envia o histórico SEM a pergunta atual
-                });
-
-                if (!response.ok) throw new Error((await response.json()).error || 'Erro no servidor.');
-                
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let sourcesProcessed = false;
-                let fullResponse = ''; // Variável para acumular a resposta completa do bot.
-                
-                botTextElement.innerHTML = ''; 
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    buffer += decoder.decode(value, { stream: true });
-                    let streamPartToRender = buffer;
-
-                    if (!sourcesProcessed && buffer.includes(STREAM_SEPARATOR)) {
-                        const [sourcesJson, streamPart] = buffer.split(STREAM_SEPARATOR);
-                        
-                        const { sources } = JSON.parse(sourcesJson);
-                        if (sources && sources.length > 0) {
-                            addSources(botContentContainer, sources);
-                        }
-                        
-                        streamPartToRender = streamPart;
-                        sourcesProcessed = true;
-                        buffer = streamPart;
-                    }
-                    
-                    if (sourcesProcessed) {
-                        fullResponse += streamPartToRender;
-                        botTextElement.textContent = fullResponse;
-                        buffer = (buffer === streamPartToRender) ? '' : buffer;
-                    }
-
-                    chatWindow.scrollTop = chatWindow.scrollHeight;
-                }
-
-                conversationHistory.push({ role: 'model', text: fullResponse });
-
-            } catch (error) {
-                console.error('Erro:', error);
-                botTextElement.innerHTML = `<span class="text-red-500">Erro: ${error.message}</span>`;
-                // Remove a última pergunta do usuário do histórico se a chamada falhar
-                conversationHistory.pop();
-            } finally {
-                messageInput.disabled = false;
-                sendButton.disabled = false;
-                messageInput.focus();
-            }
-        });
-
-        function addMessage(text, sender) {
-            const messageWrapper = document.createElement('div');
-            messageWrapper.className = `w-full mb-4 flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
-
-            const contentContainer = document.createElement('div');
-            contentContainer.className = 'flex flex-col max-w-lg';
-            if (sender === 'bot') {
-                contentContainer.classList.add('items-start');
-            } else {
-                contentContainer.classList.add('items-end');
-            }
-
-            const messageBubble = document.createElement('div');
-            messageBubble.className = `p-3 rounded-lg ${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800'}`;
-
-            const textElement = document.createElement('p');
-            textElement.className = 'message-text';
-            textElement.textContent = text;
-            
-            messageBubble.appendChild(textElement);
-            contentContainer.appendChild(messageBubble);
-            messageWrapper.appendChild(contentContainer);
-            chatWindow.appendChild(messageWrapper);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            return contentContainer;
-        }
-        
-        function addSources(contentContainer, sources) {
-            const sourcesButton = document.createElement('button');
-            sourcesButton.className = 'flex items-center space-x-2 text-sm text-indigo-600 mt-2 hover:underline focus:outline-none font-semibold';
-            
-            const buttonIcon = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`;
-            const buttonTextSpan = document.createElement('span');
-            buttonTextSpan.textContent = 'Mostrar Fontes';
-            sourcesButton.innerHTML = buttonIcon;
-            sourcesButton.appendChild(buttonTextSpan);
-            
-            const sourcesWrapper = document.createElement('div');
-            sourcesWrapper.className = 'w-full hidden';
-
-            const sourcesContent = document.createElement('div');
-            sourcesContent.className = 'p-3 mt-2 bg-gray-50 border border-gray-200 rounded-lg space-y-3';
-            
-            sources.forEach((source, index) => {
-                const sourceItem = document.createElement('div');
-                sourceItem.className = 'text-xs text-gray-700';
-                
-                const sourceTitle = document.createElement('strong');
-                sourceTitle.className = 'text-gray-900 font-bold block mb-1';
-                sourceTitle.textContent = `Fonte ${index + 1}`;
-                
-                const sourceText = document.createElement('p');
-                sourceText.className = 'border-l-2 border-gray-300 pl-2 text-gray-600';
-                sourceText.textContent = source;
-
-                sourceItem.appendChild(sourceTitle);
-                sourceItem.appendChild(sourceText);
-                sourcesContent.appendChild(sourceItem);
-            });
-            
-            sourcesWrapper.appendChild(sourcesContent);
-
-            sourcesButton.onclick = () => {
-                sourcesWrapper.classList.toggle('hidden');
-                buttonTextSpan.textContent = sourcesWrapper.classList.contains('hidden') ? 'Mostrar Fontes' : 'Ocultar Fontes';
-            };
-
-            contentContainer.appendChild(sourcesButton);
-            contentContainer.appendChild(sourcesWrapper);
-        }
-    </script>
+    <!-- Link para o arquivo de script externo -->
+    <script src="js/script.js" defer></script>
 </body>
 </html>
