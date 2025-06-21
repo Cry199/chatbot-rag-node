@@ -1,4 +1,4 @@
-/* Animação do cursor piscando */
+/* Animação do cursor a piscar */
 .blinking-cursor {
     display: inline-block;
     width: 8px;
@@ -16,16 +16,6 @@
 /* Oculta a barra de rolagem mas permite rolar */
 #chat-window::-webkit-scrollbar { display: none; }
 #chat-window { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Estilos e transição para o container das fontes */
-.sources-wrapper {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s ease-in-out;
-}
-.sources-wrapper.open {
-    max-height: 500px;
-}
 
 /* Estilos para o botão de copiar que aparece no hover */
 .message-bubble {
