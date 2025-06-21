@@ -11,6 +11,25 @@ const chromaClient = new ChromaClient({
     path: config.chromaDbHost 
 });
 
+const dummyEmbeddingFunction = { generate: (texts) => Promise.resolve([]) };
+
+async function findRelevantChunks(queryEmbedding) {
+    console.log("[Service] Buscando chunks relevantes no ChromaDB...");
+    try {
+        const collection = await chromaClient.getCollection({
+            name: config.chromaCollectionName,
+            embeddingFunction: dummyEmbeddingFunction // Adicionado para evitar o aviso
+        });
+        const results = await collection.query({
+            queryEmbeddings: [queryEmbedding],
+            nResults: 5
+        });
+        return results.metadatas[0].map(item => item.source_text);
+    } catch (error) {
+        console.error("[Service] Erro ao consultar o ChromaDB:", error);
+        return [];
+    }
+}
 
 async function transformQueryWithHistory(query, history) {
     if (!history || history.length === 0) {
