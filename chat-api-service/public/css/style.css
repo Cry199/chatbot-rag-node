@@ -1,0 +1,45 @@
+/* Animação do cursor piscando */
+.blinking-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 1.1rem;
+    background-color: #1f2937;
+    animation: blink 1s step-end infinite;
+    vertical-align: bottom;
+}
+
+@keyframes blink {
+    from, to { background-color: transparent; }
+    50% { background-color: #1f2937; }
+}
+
+/* Oculta a barra de rolagem mas permite rolar */
+#chat-window::-webkit-scrollbar { display: none; }
+#chat-window { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Estilos e transição para o container das fontes */
+.sources-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out;
+}
+.sources-wrapper.open {
+    max-height: 500px;
+}
+
+/* Estilos para o botão de copiar que aparece no hover */
+.message-bubble {
+    position: relative;
+}
+.copy-button {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    transform: scale(0.8);
+}
+.message-bubble:hover .copy-button {
+    opacity: 1;
+    transform: scale(1);
+}
