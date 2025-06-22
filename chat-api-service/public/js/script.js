@@ -1,12 +1,10 @@
-// Seletores dos elementos do DOM
 const chatWindow = document.getElementById('chat-window');
 const chatForm = document.getElementById('chat-form');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const clearChatButton = document.getElementById('clear-chat-button');
 
-// Constantes da API
-const API_URL = 'http://localhost:8080/api/chat';
+const API_URL = window.location.origin + '/api/chat';
 const STREAM_SEPARATOR = '\n--STREAM_SEPARATOR--\n';
 
 // Estado da aplicação
@@ -38,6 +36,7 @@ chatForm.addEventListener('submit', async (e) => {
     if (!query) return;
     
     conversationHistory.push({ role: 'user', text: query });
+
     messageInput.value = '';
     messageInput.disabled = true;
     sendButton.disabled = true;
@@ -53,6 +52,7 @@ chatForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, history: conversationHistory.slice(0, -1) })
         });
+
         if (!response.ok) throw new Error((await response.json()).error || 'Erro no servidor.');
         
         const reader = response.body.getReader();
@@ -89,6 +89,7 @@ chatForm.addEventListener('submit', async (e) => {
 
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
+
         conversationHistory.push({ role: 'model', text: fullResponse });
         addCopyButton(botContentContainer.querySelector('.message-bubble'), fullResponse);
 
@@ -191,6 +192,5 @@ function addCopyButton(messageBubble, textToCopy) {
     };
     messageBubble.appendChild(copyButton);
 }
-
 // Chama a função de boas-vindas na inicialização
 addWelcomeMessage();
